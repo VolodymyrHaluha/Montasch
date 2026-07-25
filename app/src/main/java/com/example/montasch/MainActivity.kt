@@ -72,7 +72,7 @@ fun MainMenu(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Оберіть, з чого бажаєте почати",
+                text = "Оберіть, з чого бажаєте почати!",
                 color = MutedInk,
                 fontSize = 16.sp
             )
