@@ -1,10 +1,12 @@
 package com.example.montasch
 
+import android.app.ActivityManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,14 +18,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,10 +44,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.montasch.ui.theme.MontaschTheme
 
-private val Ink = Color(0xFF22283A)
-private val MutedInk = Color(0xFF72798B)
-private val BrandBlue = Color(0xFF5269E8)
-private val AppBackground = Color(0xFFF7F8FC)
+private val Ink = Color(0xFF17222B)
+private val MutedInk = Color(0xFF687681)
+private val BrandOrange = Color(0xFFE56A32)
+private val BrandNavy = Color(0xFF173B4D)
+private val AppBackground = Color(0xFFF4F1EB)
+
+private enum class AppPage(val label: String, val symbol: String) {
+    TODAY("Сьогодні", "⌂"),
+    OBJECTS("Обʼєкти", "▣"),
+    TASKS("Завдання", "✓"),
+    PROFILE("Профіль", "●")
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,163 +63,210 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MontaschTheme(dynamicColor = false) {
-                MainMenu()
+                MontaschApp(onExitKiosk = ::exitKioskMode)
             }
         }
+    }
+
+    private fun exitKioskMode() {
+        val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        if (activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
+            stopLockTask()
+        }
+        finishAndRemoveTask()
     }
 }
 
 @Composable
-fun MainMenu(modifier: Modifier = Modifier) {
+fun MontaschApp(
+    modifier: Modifier = Modifier,
+    onExitKiosk: () -> Unit = {}
+) {
+    var selectedPage by remember { mutableStateOf(AppPage.TODAY) }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = AppBackground,
-        topBar = { MainNavigationBar() }
+        topBar = {
+            MainNavigationBar(
+                selectedPage = selectedPage,
+                onPageSelected = { selectedPage = it },
+                onExitKiosk = onExitKiosk
+            )
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .padding(horizontal = 24.dp, vertical = 32.dp)
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
-            Text(
-                text = "Вітаємо!",
-                color = Ink,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Оберіть, з чого бажаєте почати!",
-                color = MutedInk,
-                fontSize = 16.sp
-            )
-            Spacer(Modifier.height(28.dp))
-            MenuCard(
-                symbol = "＋",
-                title = "Створити запис",
-                description = "Додайте нову подію або нагадування",
-                accent = BrandBlue
-            )
-            Spacer(Modifier.height(16.dp))
-            MenuCard(
-                symbol = "≡",
-                title = "Мої записи",
-                description = "Переглядайте та впорядковуйте записи",
-                accent = Color(0xFF2DAA83)
-            )
-            Spacer(Modifier.height(16.dp))
-            MenuCard(
-                symbol = "□",
-                title = "Календар",
-                description = "Плануйте справи та важливі дати",
-                accent = Color(0xFFF39B4A)
-            )
+            when (selectedPage) {
+                AppPage.TODAY -> TodayPage()
+                AppPage.OBJECTS -> PlaceholderPage("Робочі обʼєкти", "Тут зберігатимуться адреси, замовники та статус монтажу.", "＋ Додати обʼєкт")
+                AppPage.TASKS -> PlaceholderPage("Завдання", "Перевіряйте етапи складання та відмічайте виконану роботу.", "＋ Нове завдання")
+                AppPage.PROFILE -> PlaceholderPage("Профіль монтажника", "Особисті дані, зміни, бригада та налаштування застосунку.", "Редагувати профіль")
+            }
         }
     }
 }
 
 @Composable
-private fun MainNavigationBar() {
-    Surface(
-        color = Color.White,
-        shadowElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp)
-        ) {
+private fun TodayPage() {
+    Text("Доброго ранку, Андрію!", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(6.dp))
+    Text("Понеділок, 3 серпня  •  Бригада №4", color = MutedInk, fontSize = 14.sp)
+    Spacer(Modifier.height(22.dp))
+
+    Surface(color = BrandNavy, shape = RoundedCornerShape(22.dp)) {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusPill("В РОБОТІ")
+                Spacer(Modifier.weight(1f))
+                Text("Обʼєкт #024", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+            }
+            Spacer(Modifier.height(18.dp))
+            Text("Кухня та гардеробна", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp))
+            Text("вул. Зелена, 115 · квартира 42", color = Color.White.copy(alpha = 0.76f), fontSize = 14.sp)
+            Spacer(Modifier.height(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                InfoChip("09:00", "Початок")
+                InfoChip("5 з 8", "Етапів")
+            }
+        }
+    }
+
+    Spacer(Modifier.height(24.dp))
+    SectionHeader("План на сьогодні", "3 завдання")
+    Spacer(Modifier.height(12.dp))
+    WorkTask("✓", "Перевірити комплектацію", "Виконано о 09:24", true)
+    Spacer(Modifier.height(10.dp))
+    WorkTask("2", "Зібрати нижні модулі", "Кухня · 6 модулів", false)
+    Spacer(Modifier.height(10.dp))
+    WorkTask("3", "Встановити стільницю", "Після складання модулів", false)
+}
+
+@Composable
+private fun MainNavigationBar(
+    selectedPage: AppPage,
+    onPageSelected: (AppPage) -> Unit,
+    onExitKiosk: () -> Unit
+) {
+    Surface(color = Color.White, shadowElevation = 3.dp) {
+        Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(BrandBlue),
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(BrandOrange),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("M", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                    Text("M", color = Color.White, fontWeight = FontWeight.Black, fontSize = 21.sp)
                 }
                 Spacer(Modifier.width(10.dp))
-                Text("Montasch", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                Column {
+                    Text("MONTASCH", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    Text("меблевий монтаж", color = MutedInk, fontSize = 10.sp)
+                }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = onExitKiosk,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE9E3), contentColor = Color(0xFFB83B25)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = ButtonDefaults.ContentPadding
+                ) {
+                    Text("Вийти", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
             }
-            Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                NavigationTab("Головна", selected = true)
-                NavigationTab("Записи")
-                NavigationTab("Календар")
-                NavigationTab("Профіль")
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                AppPage.entries.forEach { page ->
+                    NavigationTab(page, page == selectedPage) { onPageSelected(page) }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun NavigationTab(label: String, selected: Boolean = false) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            color = if (selected) BrandBlue else MutedInk,
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 10.dp)
-        )
-        Box(
-            Modifier
-                .width(if (selected) 34.dp else 0.dp)
-                .height(3.dp)
-                .clip(CircleShape)
-                .background(if (selected) BrandBlue else Color.Transparent)
-        )
+private fun NavigationTab(page: AppPage, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)).clickable(onClick = onClick).padding(horizontal = 7.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(page.symbol, color = if (selected) BrandOrange else MutedInk, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(page.label, color = if (selected) BrandOrange else MutedInk, fontSize = 11.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+        Spacer(Modifier.height(5.dp))
+        Box(Modifier.width(30.dp).height(3.dp).clip(CircleShape).background(if (selected) BrandOrange else Color.Transparent))
     }
 }
 
 @Composable
-private fun MenuCard(symbol: String, title: String, description: String, accent: Color) {
+private fun StatusPill(label: String) {
+    Box(Modifier.clip(CircleShape).background(BrandOrange).padding(horizontal = 11.dp, vertical = 5.dp)) {
+        Text(label, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+    }
+}
+
+@Composable
+private fun InfoChip(value: String, label: String) {
+    Row(Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.1f)).padding(horizontal = 12.dp, vertical = 9.dp)) {
+        Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = Color.White.copy(alpha = 0.65f), fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, detail: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.weight(1f))
+        Text(detail, color = BrandOrange, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun WorkTask(number: String, title: String, description: String, completed: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(17.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(54.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(accent.copy(alpha = 0.12f)),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(if (completed) Color(0xFFDCEFE5) else Color(0xFFFFE9DD)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(symbol, color = accent, fontSize = 28.sp, fontWeight = FontWeight.Medium)
+                Text(number, color = if (completed) Color(0xFF287A50) else BrandOrange, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(5.dp))
-                Text(description, color = MutedInk, fontSize = 14.sp, lineHeight = 19.sp)
+            Spacer(Modifier.width(13.dp))
+            Column {
+                Text(title, color = if (completed) MutedInk else Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(3.dp))
+                Text(description, color = MutedInk, fontSize = 12.sp)
             }
-            Text("›", color = Color(0xFFB1B6C4), fontSize = 30.sp)
         }
+    }
+}
+
+@Composable
+private fun PlaceholderPage(title: String, description: String, action: String) {
+    Text(title, color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(8.dp))
+    Text(description, color = MutedInk, fontSize = 15.sp, lineHeight = 22.sp)
+    Spacer(Modifier.height(24.dp))
+    Button(onClick = {}, colors = ButtonDefaults.buttonColors(containerColor = BrandOrange), shape = RoundedCornerShape(14.dp)) {
+        Text(action, fontWeight = FontWeight.Bold)
     }
 }
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-private fun MainMenuPreview() {
-    MontaschTheme(dynamicColor = false) {
-        MainMenu()
-    }
+private fun MontaschAppPreview() {
+    MontaschTheme(dynamicColor = false) { MontaschApp() }
 }
