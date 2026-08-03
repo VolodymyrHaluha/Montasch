@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -29,6 +31,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,7 +74,7 @@ class MainActivity : ComponentActivity() {
     private fun exitKioskMode() {
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
         if (activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
-            stopLockTask()
+            runCatching { stopLockTask() }
         }
         finishAndRemoveTask()
     }
@@ -83,6 +86,8 @@ fun MontaschApp(
     onExitKiosk: () -> Unit = {}
 ) {
     var selectedPage by remember { mutableStateOf(AppPage.TODAY) }
+    var showExitDialog by remember { mutableStateOf(false) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -91,7 +96,7 @@ fun MontaschApp(
             MainNavigationBar(
                 selectedPage = selectedPage,
                 onPageSelected = { selectedPage = it },
-                onExitKiosk = onExitKiosk
+                onExitKiosk = { showExitDialog = true }
             )
         }
     ) { innerPadding ->
@@ -104,16 +109,55 @@ fun MontaschApp(
         ) {
             when (selectedPage) {
                 AppPage.TODAY -> TodayPage()
-                AppPage.OBJECTS -> PlaceholderPage("Робочі обʼєкти", "Тут зберігатимуться адреси, замовники та статус монтажу.", "＋ Додати обʼєкт")
-                AppPage.TASKS -> PlaceholderPage("Завдання", "Перевіряйте етапи складання та відмічайте виконану роботу.", "＋ Нове завдання")
-                AppPage.PROFILE -> PlaceholderPage("Профіль монтажника", "Особисті дані, зміни, бригада та налаштування застосунку.", "Редагувати профіль")
+                AppPage.OBJECTS -> PlaceholderPage("Робочі обʼєкти", "Тут зберігатимуться адреси, замовники та статус монтажу.", "＋ Додати обʼєкт") {
+                    feedbackMessage = "Форму нового обʼєкта відкрито"
+                }
+                AppPage.TASKS -> PlaceholderPage("Завдання", "Перевіряйте етапи складання та відмічайте виконану роботу.", "＋ Нове завдання") {
+                    feedbackMessage = "Нове завдання додано до плану"
+                }
+                AppPage.PROFILE -> PlaceholderPage("Профіль монтажника", "Особисті дані, зміни, бригада та налаштування застосунку.", "Редагувати профіль") {
+                    feedbackMessage = "Редагування профілю увімкнено"
+                }
+            }
+
+            feedbackMessage?.let { message ->
+                Spacer(Modifier.height(18.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable { feedbackMessage = null },
+                    color = Color(0xFFDCEFE5),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("✓  $message", Modifier.padding(14.dp), color = Color(0xFF216B45), fontWeight = FontWeight.SemiBold)
+                }
             }
         }
+    }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("Вийти з режиму Kiosk?") },
+            text = { Text("Режим блокування буде завершено, а застосунок закриється.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitDialog = false
+                    onExitKiosk()
+                }) {
+                    Text("Вийти", color = Color(0xFFB83B25), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) { Text("Скасувати") }
+            }
+        )
     }
 }
 
 @Composable
 private fun TodayPage() {
+    var secondTaskDone by remember { mutableStateOf(false) }
+    var thirdTaskDone by remember { mutableStateOf(false) }
+
     Text("Доброго ранку, Андрію!", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(6.dp))
     Text("Понеділок, 3 серпня  •  Бригада №4", color = MutedInk, fontSize = 14.sp)
@@ -141,11 +185,15 @@ private fun TodayPage() {
     Spacer(Modifier.height(24.dp))
     SectionHeader("План на сьогодні", "3 завдання")
     Spacer(Modifier.height(12.dp))
-    WorkTask("✓", "Перевірити комплектацію", "Виконано о 09:24", true)
+    WorkTask("✓", "Перевірити комплектацію", "Виконано о 09:24", true) {}
     Spacer(Modifier.height(10.dp))
-    WorkTask("2", "Зібрати нижні модулі", "Кухня · 6 модулів", false)
+    WorkTask(if (secondTaskDone) "✓" else "2", "Зібрати нижні модулі", if (secondTaskDone) "Виконано" else "Кухня · 6 модулів", secondTaskDone) {
+        secondTaskDone = !secondTaskDone
+    }
     Spacer(Modifier.height(10.dp))
-    WorkTask("3", "Встановити стільницю", "Після складання модулів", false)
+    WorkTask(if (thirdTaskDone) "✓" else "3", "Встановити стільницю", if (thirdTaskDone) "Виконано" else "Після складання модулів", thirdTaskDone) {
+        thirdTaskDone = !thirdTaskDone
+    }
 }
 
 @Composable
@@ -155,7 +203,7 @@ private fun MainNavigationBar(
     onExitKiosk: () -> Unit
 ) {
     Surface(color = Color.White, shadowElevation = 3.dp) {
-        Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -230,9 +278,9 @@ private fun SectionHeader(title: String, detail: String) {
 }
 
 @Composable
-private fun WorkTask(number: String, title: String, description: String, completed: Boolean) {
+private fun WorkTask(number: String, title: String, description: String, completed: Boolean, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(17.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -255,12 +303,12 @@ private fun WorkTask(number: String, title: String, description: String, complet
 }
 
 @Composable
-private fun PlaceholderPage(title: String, description: String, action: String) {
+private fun PlaceholderPage(title: String, description: String, action: String, onAction: () -> Unit) {
     Text(title, color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(8.dp))
     Text(description, color = MutedInk, fontSize = 15.sp, lineHeight = 22.sp)
     Spacer(Modifier.height(24.dp))
-    Button(onClick = {}, colors = ButtonDefaults.buttonColors(containerColor = BrandOrange), shape = RoundedCornerShape(14.dp)) {
+    Button(onClick = onAction, colors = ButtonDefaults.buttonColors(containerColor = BrandOrange), shape = RoundedCornerShape(14.dp)) {
         Text(action, fontWeight = FontWeight.Bold)
     }
 }
