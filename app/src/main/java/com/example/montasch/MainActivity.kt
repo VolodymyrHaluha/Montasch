@@ -46,12 +46,20 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.montasch.ui.theme.MontaschTheme
+import com.example.montasch.ui.theme.FropCream
+import com.example.montasch.ui.theme.FropGreen
+import com.example.montasch.ui.theme.FropGreenSoft
+import com.example.montasch.ui.theme.FropInk
+import com.example.montasch.ui.theme.FropMuted
+import com.example.montasch.ui.theme.FropNavy
+import com.example.montasch.ui.theme.FropOrange
+import com.example.montasch.ui.theme.FropOrangeSoft
 
-private val Ink = Color(0xFF17222B)
-private val MutedInk = Color(0xFF687681)
-private val BrandOrange = Color(0xFFE56A32)
-private val BrandNavy = Color(0xFF173B4D)
-private val AppBackground = Color(0xFFF4F1EB)
+private val Ink = FropInk
+private val MutedInk = FropMuted
+private val BrandOrange = FropOrange
+private val BrandNavy = FropNavy
+private val AppBackground = FropCream
 
 private enum class AppPage(val label: String, val symbol: String) {
     TODAY("Сьогодні", "⌂"),
@@ -124,10 +132,10 @@ fun MontaschApp(
                 Spacer(Modifier.height(18.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable { feedbackMessage = null },
-                    color = Color(0xFFDCEFE5),
+                    color = FropGreenSoft,
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("✓  $message", Modifier.padding(14.dp), color = Color(0xFF216B45), fontWeight = FontWeight.SemiBold)
+                    Text("✓  $message", Modifier.padding(14.dp), color = FropGreen, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -217,12 +225,12 @@ private fun MainNavigationBar(
                 Spacer(Modifier.width(10.dp))
                 Column {
                     Text("MONTASCH", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                    Text("меблевий монтаж", color = MutedInk, fontSize = 10.sp)
+                    Text("меблевий монтаж  •  FROP 1.1", color = MutedInk, fontSize = 10.sp)
                 }
                 Spacer(Modifier.weight(1f))
                 Button(
                     onClick = onExitKiosk,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE9E3), contentColor = Color(0xFFB83B25)),
+                    colors = ButtonDefaults.buttonColors(containerColor = FropOrangeSoft, contentColor = BrandOrange),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = ButtonDefaults.ContentPadding
                 ) {
@@ -287,10 +295,10 @@ private fun WorkTask(number: String, title: String, description: String, complet
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(if (completed) Color(0xFFDCEFE5) else Color(0xFFFFE9DD)),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(if (completed) FropGreenSoft else FropOrangeSoft),
                 contentAlignment = Alignment.Center
             ) {
-                Text(number, color = if (completed) Color(0xFF287A50) else BrandOrange, fontWeight = FontWeight.Bold)
+                Text(number, color = if (completed) FropGreen else BrandOrange, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.width(13.dp))
             Column {
