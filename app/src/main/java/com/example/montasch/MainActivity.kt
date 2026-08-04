@@ -196,11 +196,11 @@ class MainActivity : ComponentActivity() {
 
     private fun verifyAdminPin(enteredPin: String): Boolean {
         val digest = MessageDigest.getInstance("SHA-256")
-            .digest((getString(R.string.admin_pin_salt) + enteredPin).toByteArray())
+            .digest((BuildConfig.ADMIN_PIN_SALT + enteredPin).toByteArray())
             .joinToString("") { "%02x".format(it) }
         return MessageDigest.isEqual(
             digest.toByteArray(),
-            getString(R.string.admin_pin_hash).toByteArray()
+            BuildConfig.ADMIN_PIN_HASH.toByteArray()
         )
     }
 }
