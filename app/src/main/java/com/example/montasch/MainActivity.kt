@@ -108,35 +108,22 @@ class MainActivity : ComponentActivity() {
 
         val devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
         if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
-            val admin = KioskDeviceAdminReceiver.componentName(this)
             devicePolicyManager.setLockTaskPackages(
-                admin,
+                KioskDeviceAdminReceiver.componentName(this),
                 arrayOf(packageName)
             )
             devicePolicyManager.setLockTaskFeatures(
-                admin,
+                KioskDeviceAdminReceiver.componentName(this),
                 DevicePolicyManager.LOCK_TASK_FEATURE_NONE
             )
             devicePolicyManager.setStatusBarDisabled(
-                admin,
+                KioskDeviceAdminReceiver.componentName(this),
                 true
-            )
-            devicePolicyManager.addPersistentPreferredActivity(
-                admin,
-                IntentFilter(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_HOME)
-                    addCategory(Intent.CATEGORY_DEFAULT)
-                },
-                ComponentName(this, MainActivity::class.java)
             )
         }
 
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        // Calling startLockTask without an allowlist starts Screen Pinning and
-        // displays Android's system confirmation. A true kiosk must be Device Owner.
-        if (devicePolicyManager.isLockTaskPermitted(packageName) &&
-            activityManager.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE
-        ) {
+        if (activityManager.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) {
             startLockTask()
         }
         hideSystemBars()
@@ -155,12 +142,10 @@ class MainActivity : ComponentActivity() {
         kioskIsActive = false
         val devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
         if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
-            val admin = KioskDeviceAdminReceiver.componentName(this)
             devicePolicyManager.setStatusBarDisabled(
-                admin,
+                KioskDeviceAdminReceiver.componentName(this),
                 false
             )
-            devicePolicyManager.clearPackagePersistentPreferredActivities(admin, packageName)
         }
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
         if (activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
