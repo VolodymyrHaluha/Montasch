@@ -242,7 +242,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun verifyAdminPin(enteredPin: String): Boolean {
-        return enteredPin == "12345"
+        return AdminPinVerifier.matches(
+            pin = enteredPin,
+            salt = getString(R.string.admin_pin_salt),
+            expectedHash = getString(R.string.admin_pin_hash)
+        )
     }
 }
 
