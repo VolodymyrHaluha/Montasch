@@ -3,6 +3,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val adminPinSalt = providers.gradleProperty("FROP_ADMIN_PIN_SALT")
+    .getOrElse("frop-kiosk-v1:")
+val adminPinHash = providers.gradleProperty("FROP_ADMIN_PIN_HASH")
+    .getOrElse("ead2eef63d6535f87e2c1d4e8d293632021e6eb9c0160f3aa6293542ded51823")
+
+fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 android {
     namespace = "com.example.montasch"
     compileSdk {
@@ -19,6 +27,9 @@ android {
         versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "ADMIN_PIN_SALT", adminPinSalt.asBuildConfigString())
+        buildConfigField("String", "ADMIN_PIN_HASH", adminPinHash.asBuildConfigString())
     }
 
     buildTypes {
@@ -39,6 +50,8 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+        resValues = true
     }
 }
 
