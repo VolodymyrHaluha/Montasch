@@ -7,11 +7,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.os.UserManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.RequiresApi
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -42,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +54,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +66,7 @@ import com.example.montasch.ui.theme.FropPrimary
 import com.example.montasch.ui.theme.FropWarning
 import com.example.montasch.ui.theme.FropWhite
 import com.example.montasch.ui.theme.MontaschTheme
+import java.security.MessageDigest
 
 private val Ink = FropInk
 private val MutedInk = FropBorder
@@ -77,8 +83,11 @@ private enum class AppPage(val label: String, val symbol: String) {
 
 class MainActivity : ComponentActivity() {
     private var kioskIsActive = true
+    private val devicePolicyManager by lazy {
+        getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    }
+    private val adminComponent by lazy { KioskDeviceAdminReceiver.componentName(this) }
 
-    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -89,14 +98,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MontaschTheme(dynamicColor = false) {
-                MontaschApp(onExitKiosk = ::exitKioskMode)
+                MontaschApp(
+                    onExitKiosk = ::exitKioskMode,
+                    verifyAdminPin = ::verifyAdminPin
+                )
             }
         }
 
         window.decorView.post { enterKioskMode() }
     }
 
-    @RequiresApi(Build.VERSION_CODES.P)
     override fun onResume() {
         super.onResume()
         if (kioskIsActive) enterKioskMode()
@@ -107,31 +118,48 @@ class MainActivity : ComponentActivity() {
         if (hasFocus && kioskIsActive) hideSystemBars()
     }
 
-    @RequiresApi(Build.VERSION_CODES.P)
     private fun enterKioskMode() {
         if (!kioskIsActive) return
 
-        val devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
-            devicePolicyManager.setLockTaskPackages(
-                KioskDeviceAdminReceiver.componentName(this),
-                arrayOf(packageName)
-            )
-            devicePolicyManager.setLockTaskFeatures(
-                KioskDeviceAdminReceiver.componentName(this),
-                DevicePolicyManager.LOCK_TASK_FEATURE_NONE
-            )
-            devicePolicyManager.setStatusBarDisabled(
-                KioskDeviceAdminReceiver.componentName(this),
-                true
-            )
+        // Never fall back to screen pinning: it can be escaped by the device user.
+        if (!devicePolicyManager.isDeviceOwnerApp(packageName)) {
+            hideSystemBars()
+            return
         }
 
+        devicePolicyManager.setLockTaskPackages(adminComponent, arrayOf(packageName))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            devicePolicyManager.setLockTaskFeatures(
+                adminComponent,
+                DevicePolicyManager.LOCK_TASK_FEATURE_NONE
+            )
+        }
+        devicePolicyManager.setStatusBarDisabled(adminComponent, true)
+        devicePolicyManager.addUserRestriction(
+            adminComponent,
+            UserManager.DISALLOW_CREATE_WINDOWS
+        )
+        makeKioskPreferredHome()
+
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        if (activityManager.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) {
+        if (devicePolicyManager.isLockTaskPermitted(packageName) &&
+            activityManager.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE
+        ) {
             startLockTask()
         }
         hideSystemBars()
+    }
+
+    private fun makeKioskPreferredHome() {
+        val homeFilter = IntentFilter(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            addCategory(Intent.CATEGORY_DEFAULT)
+        }
+        devicePolicyManager.addPersistentPreferredActivity(
+            adminComponent,
+            homeFilter,
+            ComponentName(this, MainActivity::class.java)
+        )
     }
 
     private fun hideSystemBars() {
@@ -145,11 +173,15 @@ class MainActivity : ComponentActivity() {
 
     private fun exitKioskMode() {
         kioskIsActive = false
-        val devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
         if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
-            devicePolicyManager.setStatusBarDisabled(
-                KioskDeviceAdminReceiver.componentName(this),
-                false
+            devicePolicyManager.setStatusBarDisabled(adminComponent, false)
+            devicePolicyManager.clearUserRestriction(
+                adminComponent,
+                UserManager.DISALLOW_CREATE_WINDOWS
+            )
+            devicePolicyManager.clearPackagePersistentPreferredActivities(
+                adminComponent,
+                packageName
             )
         }
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -158,17 +190,31 @@ class MainActivity : ComponentActivity() {
         }
         WindowCompat.getInsetsController(window, window.decorView)
             .show(WindowInsetsCompat.Type.systemBars())
-        finishAndRemoveTask()
+        startActivity(Intent(Settings.ACTION_SETTINGS))
+        finish()
+    }
+
+    private fun verifyAdminPin(enteredPin: String): Boolean {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest((getString(R.string.admin_pin_salt) + enteredPin).toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return MessageDigest.isEqual(
+            digest.toByteArray(),
+            getString(R.string.admin_pin_hash).toByteArray()
+        )
     }
 }
 
 @Composable
 fun MontaschApp(
     modifier: Modifier = Modifier,
-    onExitKiosk: () -> Unit = {}
+    onExitKiosk: () -> Unit = {},
+    verifyAdminPin: (String) -> Boolean = { false }
 ) {
     var selectedPage by remember { mutableStateOf(AppPage.TODAY) }
     var showExitDialog by remember { mutableStateOf(false) }
+    var adminPin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf(false) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
@@ -217,19 +263,52 @@ fun MontaschApp(
 
     if (showExitDialog) {
         AlertDialog(
-            onDismissRequest = { showExitDialog = false },
+            onDismissRequest = {
+                showExitDialog = false
+                adminPin = ""
+                pinError = false
+            },
             title = { Text("Вийти з режиму Kiosk?") },
-            text = { Text("Режим блокування буде завершено, а застосунок закриється.") },
+            text = {
+                Column {
+                    Text("Введіть PIN-код адміністратора, щоб відкрити налаштування Android.")
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = adminPin,
+                        onValueChange = {
+                            adminPin = it.filter(Char::isDigit).take(12)
+                            pinError = false
+                        },
+                        label = { Text("PIN адміністратора") },
+                        singleLine = true,
+                        isError = pinError,
+                        supportingText = if (pinError) {
+                            { Text("Неправильний PIN-код") }
+                        } else null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
-                    showExitDialog = false
-                    onExitKiosk()
+                    if (verifyAdminPin(adminPin)) {
+                        showExitDialog = false
+                        adminPin = ""
+                        onExitKiosk()
+                    } else {
+                        pinError = true
+                    }
                 }) {
                     Text("Вийти", color = FropPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) { Text("Скасувати") }
+                TextButton(onClick = {
+                    showExitDialog = false
+                    adminPin = ""
+                    pinError = false
+                }) { Text("Скасувати") }
             }
         )
     }
