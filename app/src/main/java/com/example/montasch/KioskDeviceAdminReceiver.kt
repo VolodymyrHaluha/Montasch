@@ -5,10 +5,13 @@ import android.content.ComponentName
 import android.content.Context
 
 class KioskDeviceAdminReceiver : DeviceAdminReceiver() {
+
     companion object {
-        fun componentName(context: Context) = ComponentName(
-            context,
-            KioskDeviceAdminReceiver::class.java
-        )
+        fun componentName(context: Context): ComponentName {
+            return ComponentName(
+                context,
+                KioskDeviceAdminReceiver::class.java
+            )
+        }
     }
 }

@@ -1,74 +1,72 @@
-# Налаштування справжнього Kiosk Mode
+# Montasch — справжній Android Kiosk Mode
 
-Android дозволяє застосунку самостійно ввімкнути повний Lock Task Mode лише тоді,
-коли застосунок призначений **Device Owner**. Без цього Android запускає звичайне
-закріплення екрана, з якого користувач може вийти системною комбінацією кнопок.
+Цей проєкт використовує **Device Owner + Lock Task Mode + persistent HOME app**.
+Без призначення Device Owner Android завжди запускатиме Montasch як звичайний
+застосунок, і користувач зможе натиснути Home або відкрити Recents.
 
-## Debug-збірка на чистому емуляторі
+## 1. Підготуйте телефон
 
-1. Видаліть усі Google-акаунти з емулятора або створіть новий емулятор без акаунтів.
-2. Встановіть debug-збірку:
+Для тестового встановлення найнадійніший варіант — скинути телефон до заводських
+налаштувань. Під час початкового налаштування не додавайте Google-акаунт, робочий
+профіль або інших користувачів. Увімкніть Developer options та USB debugging.
 
-   ```powershell
-   .\gradlew.bat installDebug
-   ```
+## 2. Встановіть застосунок
 
-3. Призначте застосунок Device Owner **до першого звичайного налаштування пристрою**:
-
-   ```powershell
-   adb shell dpm set-device-owner com.example.montasch.debug/com.example.montasch.KioskDeviceAdminReceiver
-   ```
-
-4. Запустіть застосунок:
-
-   ```powershell
-   adb shell am start -n com.example.montasch.debug/com.example.montasch.MainActivity
-   ```
-
-Після запуску застосунок автоматично приховує системні панелі та входить у Lock
-Task Mode. Системна кнопка «Назад» вимкнена. Штатний вихід виконується лише через
-кнопку **«Вийти»** та PIN адміністратора.
-
-## PIN адміністратора
-
-У APK зберігається лише SHA-256 хеш із сіллю, а не відкритий PIN. Перед production-
-збіркою згенеруйте власні значення (приклад для PIN `123456`):
-
-```bash
-printf 'your-random-salt:%s' '123456' | sha256sum
-./gradlew assembleRelease \
-  -PFROP_ADMIN_PIN_SALT='your-random-salt:' \
-  -PFROP_ADMIN_PIN_HASH='<отриманий SHA-256>'
-```
-
-Тестовий PIN збірки за замовчуванням — `2604`. Його потрібно обов'язково замінити
-для реального пристрою. Після успішної перевірки застосунок завершує Lock Task,
-відновлює системні панелі й відкриває налаштування Android.
-
-Коли Device Owner налаштовано правильно, Android **не показує** системне вікно
-«Ця програма закріплена». Це вікно належить звичайному Screen Pinning і означає,
-що застосунок не був призначений Device Owner. Код навмисно не викликає
-`startLockTask()` без Device Owner allowlist, щоб таке повідомлення не зʼявлялося.
-
-## Автозапуск після перезавантаження
-
-Device Owner реєструє Montasch як постійний HOME-застосунок. Додатково receiver
-обробляє `LOCKED_BOOT_COMPLETED` і `BOOT_COMPLETED`. Тому після завантаження
-пристрою `MainActivity` запускається автоматично, повертає immersive mode та
-повторно входить у Lock Task Mode. Перевірити це можна командою:
+У PowerShell з кореня проєкту:
 
 ```powershell
-adb reboot
+.\gradlew.bat installDebug
 ```
 
-## Release-збірка
+У виправленій збірці debug і release використовують один package name:
+`com.example.montasch`.
 
-Для release-пакета використовуйте компонент без суфікса `.debug`:
+## 3. Призначте Montasch Device Owner
 
 ```powershell
 adb shell dpm set-device-owner com.example.montasch/com.example.montasch.KioskDeviceAdminReceiver
 ```
 
-Команда `dpm set-device-owner` працює лише на чистому пристрої без акаунтів та
-іншого Device Owner. Для промислового розгортання Device Owner слід призначати
-через QR provisioning або вашу EMM-систему.
+Перевірка:
+
+```powershell
+adb shell dpm list owners
+```
+
+У результаті `com.example.montasch` має бути позначений як Device Owner.
+Якщо команда повідомляє, що пристрій уже provisioned, має акаунти або іншого
+власника, виконайте factory reset та повторіть без додавання акаунтів.
+
+## 4. Запустіть Montasch
+
+```powershell
+adb shell am start -n com.example.montasch/com.example.montasch.MainActivity
+```
+
+Після першого запуску застосунок:
+
+- додає себе до Lock Task allowlist;
+- вимикає Home, Recents, шторку, повідомлення та power menu в Lock Task;
+- стає постійним HOME-застосунком;
+- запускається після перезавантаження;
+- тримає екран увімкненим під час роботи;
+- дозволяє вийти лише кнопкою «Вийти» з PIN `12345`.
+
+## 5. Перевірте перезапуск
+
+```powershell
+adb reboot
+```
+
+Після завантаження Android повинен автоматично відкрити Montasch та повернути
+Lock Task Mode.
+
+## Важливо
+
+Просто встановити APK недостатньо. Device Owner — це системна роль, яку не можна
+надійно отримати натисканням кнопки всередині звичайного застосунку. Для серійного
+розгортання використовуйте Android Enterprise QR provisioning або EMM.
+
+Коротке натискання фізичної кнопки живлення може погасити дисплей на деяких
+моделях. Після повторного ввімкнення екрана користувач має повернутися до Montasch;
+повністю перепризначити фізичну кнопку живлення звичайний Android SDK не дозволяє.

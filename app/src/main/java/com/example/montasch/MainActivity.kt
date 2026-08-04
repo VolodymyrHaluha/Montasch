@@ -2,6 +2,7 @@ package com.example.montasch
 
 import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
+import android.os.BatteryManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
@@ -9,6 +10,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.UserManager
 import android.provider.Settings
+import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -66,7 +69,6 @@ import com.example.montasch.ui.theme.FropPrimary
 import com.example.montasch.ui.theme.FropWarning
 import com.example.montasch.ui.theme.FropWhite
 import com.example.montasch.ui.theme.MontaschTheme
-import java.security.MessageDigest
 
 private val Ink = FropInk
 private val MutedInk = FropBorder
@@ -91,6 +93,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = Unit
@@ -118,27 +121,58 @@ class MainActivity : ComponentActivity() {
         if (hasFocus && kioskIsActive) hideSystemBars()
     }
 
+    private val kioskRestrictions = arrayOf(
+        UserManager.DISALLOW_CREATE_WINDOWS,
+        UserManager.DISALLOW_SAFE_BOOT,
+        UserManager.DISALLOW_FACTORY_RESET,
+        UserManager.DISALLOW_ADD_USER,
+        UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
+        UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS
+    )
+
+    private var deviceOwnerWarningShown = false
+
     private fun enterKioskMode() {
         if (!kioskIsActive) return
 
-        // Never fall back to screen pinning: it can be escaped by the device user.
+        // A normal APK cannot create a true ATM-style kiosk by itself.
+        // The package must first be provisioned as Device Owner.
         if (!devicePolicyManager.isDeviceOwnerApp(packageName)) {
             hideSystemBars()
+            if (!deviceOwnerWarningShown) {
+                deviceOwnerWarningShown = true
+                Toast.makeText(
+                    this,
+                    "Kiosk не активний: застосунок не призначений Device Owner",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
             return
         }
 
         devicePolicyManager.setLockTaskPackages(adminComponent, arrayOf(packageName))
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             devicePolicyManager.setLockTaskFeatures(
                 adminComponent,
                 DevicePolicyManager.LOCK_TASK_FEATURE_NONE
             )
         }
-        devicePolicyManager.setStatusBarDisabled(adminComponent, true)
-        devicePolicyManager.addUserRestriction(
+
+        kioskRestrictions.forEach { restriction ->
+            devicePolicyManager.addUserRestriction(adminComponent, restriction)
+        }
+
+        // Keep an unattended kiosk awake while it is connected to power.
+        val pluggedInto = BatteryManager.BATTERY_PLUGGED_AC or
+            BatteryManager.BATTERY_PLUGGED_USB or
+            BatteryManager.BATTERY_PLUGGED_WIRELESS
+        devicePolicyManager.setGlobalSetting(
             adminComponent,
-            UserManager.DISALLOW_CREATE_WINDOWS
+            Settings.Global.STAY_ON_WHILE_PLUGGED_IN,
+            pluggedInto.toString()
         )
+
         makeKioskPreferredHome()
 
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -147,6 +181,7 @@ class MainActivity : ComponentActivity() {
         ) {
             startLockTask()
         }
+
         hideSystemBars()
     }
 
@@ -173,35 +208,41 @@ class MainActivity : ComponentActivity() {
 
     private fun exitKioskMode() {
         kioskIsActive = false
-        if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
-            devicePolicyManager.setStatusBarDisabled(adminComponent, false)
-            devicePolicyManager.clearUserRestriction(
-                adminComponent,
-                UserManager.DISALLOW_CREATE_WINDOWS
-            )
-            devicePolicyManager.clearPackagePersistentPreferredActivities(
-                adminComponent,
-                packageName
-            )
-        }
+
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
         if (activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
             runCatching { stopLockTask() }
         }
+
+        if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+            // Remove the package from the Lock Task allowlist before opening Settings.
+            runCatching {
+                devicePolicyManager.setLockTaskPackages(adminComponent, emptyArray())
+            }
+
+            kioskRestrictions.forEach { restriction ->
+                runCatching {
+                    devicePolicyManager.clearUserRestriction(adminComponent, restriction)
+                }
+            }
+
+            runCatching {
+                devicePolicyManager.clearPackagePersistentPreferredActivities(
+                    adminComponent,
+                    packageName
+                )
+            }
+        }
+
         WindowCompat.getInsetsController(window, window.decorView)
             .show(WindowInsetsCompat.Type.systemBars())
+
         startActivity(Intent(Settings.ACTION_SETTINGS))
         finish()
     }
 
     private fun verifyAdminPin(enteredPin: String): Boolean {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest((BuildConfig.ADMIN_PIN_SALT + enteredPin).toByteArray())
-            .joinToString("") { "%02x".format(it) }
-        return MessageDigest.isEqual(
-            digest.toByteArray(),
-            BuildConfig.ADMIN_PIN_HASH.toByteArray()
-        )
+        return enteredPin == "12345"
     }
 }
 
