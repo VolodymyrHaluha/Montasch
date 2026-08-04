@@ -3,6 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val defaultAdminPinSalt = "frop-kiosk-v1:"
+val defaultAdminPinHash = "ead2eef63d6535f87e2c1d4e8d293632021e6eb9c0160f3aa6293542ded51823"
+
 android {
     namespace = "com.example.montasch"
     compileSdk {
@@ -20,6 +23,16 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        buildConfigField(
+            "String",
+            "ADMIN_PIN_SALT",
+            "\"${providers.gradleProperty("FROP_ADMIN_PIN_SALT").getOrElse(defaultAdminPinSalt)}\""
+        )
+        buildConfigField(
+            "String",
+            "ADMIN_PIN_HASH",
+            "\"${providers.gradleProperty("FROP_ADMIN_PIN_HASH").getOrElse(defaultAdminPinHash)}\""
+        )
     }
 
     buildTypes {
@@ -40,6 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

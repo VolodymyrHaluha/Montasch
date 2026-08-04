@@ -32,15 +32,14 @@ Task Mode. Системна кнопка «Назад» вимкнена. Шта
 ## PIN адміністратора
 
 У APK зберігається лише SHA-256 хеш із сіллю, а не відкритий PIN. Перед production-
-збіркою згенеруйте власний хеш (приклад для PIN `123456`):
+збіркою згенеруйте власні значення (приклад для PIN `123456`):
 
 ```bash
 printf 'your-random-salt:%s' '123456' | sha256sum
+./gradlew assembleRelease \
+  -PFROP_ADMIN_PIN_SALT='your-random-salt:' \
+  -PFROP_ADMIN_PIN_HASH='<отриманий SHA-256>'
 ```
-
-Запишіть сіль у `admin_pin_salt`, а отриманий хеш — у `admin_pin_hash` у файлі
-`app/src/main/res/values/strings.xml`, після чого зберіть release APK. Це звичайні
-Android-ресурси, тому для них не потрібні `BuildConfig` або Gradle `resValue`.
 
 Тестовий PIN збірки за замовчуванням — `2604`. Його потрібно обов'язково замінити
 для реального пристрою. Після успішної перевірки застосунок завершує Lock Task,
