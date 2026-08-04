@@ -23,15 +23,15 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        resValue(
-            "string",
-            "admin_pin_salt",
-            providers.gradleProperty("FROP_ADMIN_PIN_SALT").getOrElse(defaultAdminPinSalt)
+        buildConfigField(
+            "String",
+            "ADMIN_PIN_SALT",
+            "\"${providers.gradleProperty("FROP_ADMIN_PIN_SALT").getOrElse(defaultAdminPinSalt)}\""
         )
-        resValue(
-            "string",
-            "admin_pin_hash",
-            providers.gradleProperty("FROP_ADMIN_PIN_HASH").getOrElse(defaultAdminPinHash)
+        buildConfigField(
+            "String",
+            "ADMIN_PIN_HASH",
+            "\"${providers.gradleProperty("FROP_ADMIN_PIN_HASH").getOrElse(defaultAdminPinHash)}\""
         )
     }
 
@@ -53,8 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
-        // AGP 9 disables generated resValue resources unless explicitly enabled.
-        resValues = true
+        buildConfig = true
     }
 }
 
