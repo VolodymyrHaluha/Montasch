@@ -2,6 +2,9 @@ package com.example.montasch
 
 import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
