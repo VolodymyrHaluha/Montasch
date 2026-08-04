@@ -1,72 +1,60 @@
-# Montasch — справжній Android Kiosk Mode
+# Montasch — тест Kiosk Mode в Android Emulator
 
-Цей проєкт використовує **Device Owner + Lock Task Mode + persistent HOME app**.
-Без призначення Device Owner Android завжди запускатиме Montasch як звичайний
-застосунок, і користувач зможе натиснути Home або відкрити Recents.
+Застосунок використовує **Device Owner**, **Lock Task Mode** і реєструється як
+постійний HOME-застосунок. Це блокує Home, Recents, шторку сповіщень і вихід із
+застосунку. Кнопка **«Вийти»** з PIN `12345` зупиняє Lock Task та відкриває
+налаштування Android.
 
-## 1. Підготуйте телефон
+## Підготовка емулятора
 
-Для тестового встановлення найнадійніший варіант — скинути телефон до заводських
-налаштувань. Під час початкового налаштування не додавайте Google-акаунт, робочий
-профіль або інших користувачів. Увімкніть Developer options та USB debugging.
+1. В Android Studio відкрийте **Device Manager → Add a new device**.
+2. Створіть AVD з образом Android без позначки **Google Play**. Device Owner не
+   можна призначити на вже налаштований емулятор з акаунтами.
+3. Запустіть AVD. Якщо він використовувався раніше, виберіть **Wipe Data**, а
+   після запуску не додавайте Google-акаунт і не створюйте робочий профіль.
+4. Переконайтеся, що `adb devices` показує рівно один пристрій зі статусом
+   `device`.
 
-## 2. Встановіть застосунок
+Фізичний Android-пристрій для цього тесту не потрібен.
 
-У PowerShell з кореня проєкту:
+## Автоматичне встановлення (macOS/Linux)
+
+З кореня проєкту виконайте:
+
+```bash
+chmod +x setup-kiosk-emulator.sh
+./setup-kiosk-emulator.sh
+```
+
+Скрипт перевіряє, що підключено саме емулятор, збирає та встановлює debug APK,
+призначає застосунок Device Owner і запускає Kiosk.
+
+## Ручне встановлення (Windows PowerShell)
 
 ```powershell
 .\gradlew.bat installDebug
+adb shell dpm set-device-owner com.example.montasch/.KioskDeviceAdminReceiver
+adb shell am start -n com.example.montasch/.MainActivity
 ```
 
-У виправленій збірці debug і release використовують один package name:
-`com.example.montasch`.
-
-## 3. Призначте Montasch Device Owner
-
-```powershell
-adb shell dpm set-device-owner com.example.montasch/com.example.montasch.KioskDeviceAdminReceiver
-```
-
-Перевірка:
+Перевірити системну роль можна командою:
 
 ```powershell
 adb shell dpm list owners
 ```
 
-У результаті `com.example.montasch` має бути позначений як Device Owner.
-Якщо команда повідомляє, що пристрій уже provisioned, має акаунти або іншого
-власника, виконайте factory reset та повторіть без додавання акаунтів.
+У відповіді `com.example.montasch` має бути позначений як Device Owner. Якщо
+`dpm set-device-owner` повідомляє, що пристрій уже provisioned, виконайте **Wipe
+Data** для AVD та повторіть інсталяцію на чистому емуляторі.
 
-## 4. Запустіть Montasch
+## Перевірка
 
-```powershell
-adb shell am start -n com.example.montasch/com.example.montasch.MainActivity
-```
+- Home, Recents і системна шторка недоступні.
+- Після `adb reboot` Montasch запускається автоматично та знову входить у Lock
+  Task Mode.
+- Натискання системної кнопки Back не закриває застосунок.
+- **«Вийти» → PIN `12345`** повертає доступ до налаштувань Android.
 
-Після першого запуску застосунок:
-
-- додає себе до Lock Task allowlist;
-- вимикає Home, Recents, шторку, повідомлення та power menu в Lock Task;
-- стає постійним HOME-застосунком;
-- запускається після перезавантаження;
-- тримає екран увімкненим під час роботи;
-- дозволяє вийти лише кнопкою «Вийти» з PIN `12345`.
-
-## 5. Перевірте перезапуск
-
-```powershell
-adb reboot
-```
-
-Після завантаження Android повинен автоматично відкрити Montasch та повернути
-Lock Task Mode.
-
-## Важливо
-
-Просто встановити APK недостатньо. Device Owner — це системна роль, яку не можна
-надійно отримати натисканням кнопки всередині звичайного застосунку. Для серійного
-розгортання використовуйте Android Enterprise QR provisioning або EMM.
-
-Коротке натискання фізичної кнопки живлення може погасити дисплей на деяких
-моделях. Після повторного ввімкнення екрана користувач має повернутися до Montasch;
-повністю перепризначити фізичну кнопку живлення звичайний Android SDK не дозволяє.
+Для повторного чистого тесту скористайтеся **Device Manager → Wipe Data**.
+Звичайного встановлення APK недостатньо: системну роль Device Owner надає лише
+`adb` на чистому тестовому AVD (або Android Enterprise provisioning у production).
