@@ -5,11 +5,13 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.RequiresApi
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -76,6 +78,7 @@ private enum class AppPage(val label: String, val symbol: String) {
 class MainActivity : ComponentActivity() {
     private var kioskIsActive = true
 
+    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -93,6 +96,7 @@ class MainActivity : ComponentActivity() {
         window.decorView.post { enterKioskMode() }
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     override fun onResume() {
         super.onResume()
         if (kioskIsActive) enterKioskMode()
@@ -103,6 +107,7 @@ class MainActivity : ComponentActivity() {
         if (hasFocus && kioskIsActive) hideSystemBars()
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun enterKioskMode() {
         if (!kioskIsActive) return
 
