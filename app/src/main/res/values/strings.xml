@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Montasch FROP</string>
     <string name="kiosk_admin_description">Керує блокуванням пристрою в робочому режимі Kiosk</string>
+    <!-- Replace both values before production deployment. The default test PIN is 2604. -->
+    <string name="admin_pin_salt" translatable="false">frop-kiosk-v1:</string>
+    <string name="admin_pin_hash" translatable="false">ead2eef63d6535f87e2c1d4e8d293632021e6eb9c0160f3aa6293542ded51823</string>
 </resources>
