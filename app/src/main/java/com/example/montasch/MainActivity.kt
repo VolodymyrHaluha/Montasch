@@ -1,10 +1,15 @@
 package com.example.montasch
 
 import android.app.ActivityManager
+import android.app.admin.DevicePolicyManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -66,21 +71,85 @@ private enum class AppPage(val label: String, val symbol: String) {
 }
 
 class MainActivity : ComponentActivity() {
+    private var kioskIsActive = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() = Unit
+        })
+
         setContent {
             MontaschTheme(dynamicColor = false) {
                 MontaschApp(onExitKiosk = ::exitKioskMode)
             }
         }
+
+        window.decorView.post { enterKioskMode() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (kioskIsActive) enterKioskMode()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && kioskIsActive) hideSystemBars()
+    }
+
+    private fun enterKioskMode() {
+        if (!kioskIsActive) return
+
+        val devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+            devicePolicyManager.setLockTaskPackages(
+                KioskDeviceAdminReceiver.componentName(this),
+                arrayOf(packageName)
+            )
+            devicePolicyManager.setLockTaskFeatures(
+                KioskDeviceAdminReceiver.componentName(this),
+                DevicePolicyManager.LOCK_TASK_FEATURE_NONE
+            )
+            devicePolicyManager.setStatusBarDisabled(
+                KioskDeviceAdminReceiver.componentName(this),
+                true
+            )
+        }
+
+        val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        if (activityManager.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) {
+            startLockTask()
+        }
+        hideSystemBars()
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     private fun exitKioskMode() {
+        kioskIsActive = false
+        val devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        if (devicePolicyManager.isDeviceOwnerApp(packageName)) {
+            devicePolicyManager.setStatusBarDisabled(
+                KioskDeviceAdminReceiver.componentName(this),
+                false
+            )
+        }
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
         if (activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
             runCatching { stopLockTask() }
         }
+        WindowCompat.getInsetsController(window, window.decorView)
+            .show(WindowInsetsCompat.Type.systemBars())
         finishAndRemoveTask()
     }
 }

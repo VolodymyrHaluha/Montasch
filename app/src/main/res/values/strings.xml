@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Montasch FROP</string>
+    <string name="kiosk_admin_description">Керує блокуванням пристрою в робочому режимі Kiosk</string>
 </resources>
